@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Message Card</title>
+<style>
+    :root {
+        --bg-color: #0d0221;
+        --glow-color: #00ffff;
+        --glow-rgb: 0, 255, 255;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-family: 'Segoe UI', sans-serif;
+        background: radial-gradient(circle at center, rgba(var(--glow-rgb), 0.15) 0%, transparent 60%), var(--bg-color);
+        transition: background 0.5s ease;
+    }
+    #particle-canvas {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .main-wrapper {
+        position: relative;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+    }
+    
+    #emojiLetterBox {
+        font-size: 150px;
+        cursor: pointer;
+        position: relative;
+        text-shadow: 0 0 8px var(--glow-color), 0 0 16px rgba(var(--glow-rgb), 0.7);
+        transition: transform 0.2s ease, text-shadow 0.5s ease, filter 0.5s ease;
+    }
+    #emojiLetterBox.open {
+        transform: scale(1.2);
+    }
+
+    .buttons {
+        position: absolute;
+        top: 15px; right: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 20;
+    }
+    
+    .glass-effect {
+        background: rgba(var(--glow-rgb), 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glow-color);
+        box-shadow: 0 0 15px rgba(var(--glow-rgb), 0.5), inset 0 0 8px rgba(var(--glow-rgb), 0.3);
+        transition: border-color 0.5s ease, box-shadow 0.5s ease, background 0.5s ease;
+    }
+
+    button {
+        padding: 10px 15px;
+        border-radius: 12px;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+        outline: none;
+    }
+    button:active { transform: scale(0.9); }
+    
+    .message-container {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 30;
+        visibility: hidden;
+        opacity: 0;
+        transition: opacity 0.4s ease, visibility 0.4s;
+    }
+    .message-container.show {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    .message-box {
+        position: relative;
+        border-radius: 15px;
+        padding: 30px 25px 25px 25px;
+        width: 90%;
+        max-width: 320px; 
+        text-align: center;
+        color: #fff;
+    }
+
+    #closeBtn {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        padding: 0;
+        background: none;
+        border: none;
+        font-size: 28px;
+        font-weight: bold;
+        line-height: 1;
+        opacity: 0.7;
+        transition: opacity 0.2s ease;
+    }
+    #closeBtn:hover { opacity: 1; }
+    
+    textarea {
+        width: 100%;
+        height: 220px; 
+        resize: none;
+        border-radius: 8px;
+        border: 1px solid var(--glow-color);
+        padding: 10px;
+        font-size: 18px;
+        font-weight: bold;
+        background: rgba(0,0,0,0.3);
+        color: var(--glow-color);
+        transition: border-color 0.5s ease, color 0.5s ease;
+    }
+    textarea::placeholder {
+        color: rgba(var(--glow-rgb), 0.5);
+        font-weight: normal;
+    }
+
+    .copy-btn {
+        margin-top: 15px;
+        padding: 10px 18px;
+        border: none;
+        border-radius: 8px;
+        background: var(--glow-color);
+        color: #000;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 0 10px rgba(var(--glow-rgb), 0.8);
+        transition: background 0.5s ease, box-shadow 0.5s ease;
+    }
+</style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+
+<div class="buttons">
+    <button id="glowBtn" class="glass-effect">✨ Change Glow</button>
+    <button id="bgBtn" class="glass-effect">🎨 Change Background</button>
+</div>
+
+<div class="main-wrapper">
+    <div id="emojiLetterBox">💌</div>
+</div>
+
+<div class="message-container" id="messageContainer">
+    <div class="message-box glass-effect" id="messageBox">
+        <button id="closeBtn">×</button>
+        <textarea id="wishInput" placeholder="Write your caption here..."></textarea>
+        <button class="copy-btn" id="copyBtn">Copy Link</button>
+    </div>
+</div>
+
+<script>
+    // -- सभी नए रंगों को यहाँ जोड़ दिया गया है --
+    const glowThemes = [
+        { hex: '#ff0000', rgb: '255, 0, 0',    filter: 'hue-rotate(190deg) saturate(2) brightness(1.1)' }, // Red
+        { hex: '#ff69b4', rgb: '255, 105, 180',filter: 'hue-rotate(160deg) saturate(2)' },                 // Pink
+        { hex: '#ff8c00', rgb: '255, 140, 0',  filter: 'hue-rotate(220deg) saturate(2)' },                // Orange
+        { hex: '#ffd700', rgb: '255, 215, 0',  filter: 'hue-rotate(250deg) saturate(2)' },                // Yellow / Gold
+        { hex: '#00ff00', rgb: '0, 255, 0',    filter: 'hue-rotate(290deg) saturate(1.5)' },               // Lime Green
+        { hex: '#00ffff', rgb: '0, 255, 255',  filter: 'hue-rotate(0deg) saturate(1.5)' },                  // Cyan (Default)
+        { hex: '#0000ff', rgb: '0, 0, 255',    filter: 'hue-rotate(120deg) saturate(1.5)' },                // Blue
+        { hex: '#8a2be2', rgb: '138, 43, 226', filter: 'hue-rotate(150deg) saturate(1.5)' },               // Purple / Violet
+        { hex: '#ff00ff', rgb: '255, 0, 255',  filter: 'hue-rotate(180deg) saturate(1.5)' }                // Magenta
+    ];
+    const bgColors = ["#0d0221", "#0b0014", "#1a1a2e", "#241744", "#000000", "#191970"];
+    
+    const letterBox = document.getElementById("emojiLetterBox");
+    const messageContainer = document.getElementById("messageContainer");
+    const wishInput = document.getElementById("wishInput");
+    const copyBtn = document.getElementById("copyBtn");
+    const glowBtn = document.getElementById("glowBtn");
+    const bgBtn = document.getElementById("bgBtn");
+    const closeBtn = document.getElementById("closeBtn");
+    
+    let glowIndex = 0, bgIndex = 0;
+
+    glowBtn.addEventListener("click", () => {
+        glowIndex = (glowIndex + 1) % glowThemes.length;
+        const newTheme = glowThemes[glowIndex];
+        
+        const root = document.documentElement;
+        root.style.setProperty('--glow-color', newTheme.hex);
+        root.style.setProperty('--glow-rgb', newTheme.rgb);
+        
+        letterBox.style.filter = newTheme.filter;
+    });
+
+    bgBtn.addEventListener("click", () => {
+        bgIndex = (bgIndex + 1) % bgColors.length;
+        document.body.style.backgroundColor = bgColors[bgIndex];
+    });
+
+    const params=new URLSearchParams(window.location.search);
+    const wish=params.get("wish");
+
+    letterBox.addEventListener("click", () => {
+        letterBox.classList.add("open");
+        setTimeout(() => {
+            messageContainer.classList.add("show");
+            if(wish) { 
+                wishInput.value = decodeURIComponent(wish);
+                wishInput.disabled = true;
+                copyBtn.style.display = "none";
+            }
+        }, 300);
+    });
+
+    function closeMessageBox() {
+        messageContainer.classList.remove("show");
+        letterBox.classList.remove("open");
+    }
+
+    closeBtn.addEventListener("click", closeMessageBox);
+    messageContainer.addEventListener("click", (e) => {
+        if(e.target === messageContainer) {
+            closeMessageBox();
+        }
+    });
+
+    copyBtn.addEventListener("click", () => {
+        let text=wishInput.value.trim();
+        if(text.split(/\s+/).length > 200){
+            alert("Caption is limited to 200 words!"); 
+            return;
+        }
+        let url=window.location.origin+window.location.pathname+"?wish="+encodeURIComponent(text);
+        navigator.clipboard.writeText(url);
+        alert("Link Copied!");
+    });
+
+    const canvas=document.getElementById("particle-canvas");
+    const ctx=canvas.getContext("2d");
+    let particles=[];
+    const emojis=['🌸','🌺','❤️','💖','💝','💜','🌹','🌷','💕','✨'];
+    function resizeCanvas(){
+        canvas.width=window.innerWidth;
+        canvas.height=innerHeight;
+    }
+    window.addEventListener("resize",resizeCanvas);
+    resizeCanvas();
+    function createParticle(){
+        particles.push({
+            x:Math.random()*canvas.width,
+            y:-20,
+            vx:(Math.random()-0.5)*2,
+            vy:Math.random() * 3 + 2,
+            emoji:emojis[Math.floor(Math.random()*emojis.length)],
+            size: Math.random() * 15 + 10,
+            stopped: false
+        });
+        if(particles.length>250)particles.shift();
+    }
+    function animate(){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        for(let p of particles){
+            if (!p.stopped) {
+                p.vy+=0.05;
+                p.x+=p.vx;
+                p.y+=p.vy;
+                if(p.y > canvas.height - p.size / 2){
+                    p.y = canvas.height - p.size / 2;
+                    p.vy=0;
+                    p.vx*=0.8;
+                    if (Math.abs(p.vx) < 0.1) {
+                        p.vx = 0;
+                        p.stopped = true;
+                    }
+                }
+            }
+            ctx.font=`${p.size}px Arial`;
+            ctx.fillText(p.emoji,p.x,p.y);
+        }
+        requestAnimationFrame(animate);
+    }
+    setInterval(createParticle, 50);
+    setInterval(() => {
+        let removedCount = 0;
+        while(removedCount < 10 && particles.length > 0 && particles[0].stopped) {
+            particles.shift();
+            removedCount++;
+        }
+    }, 1000);
+    
+    animate();
+
+</script>
+</body>
+</html>
